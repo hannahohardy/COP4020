@@ -38,37 +38,55 @@ public class TypeChecker  implements ASTVisitor
     @Override
     public Object visitAssignmentStatement(AssignmentStatement statementAssign, Object arg) throws PLCException
     {
-        String name = statementAssign.toString();
-        Declaration dec = symbolTable.lookup(name);
-        checkNull(dec != null,  "undefined identifier " + name);
-        checkAssigned(dec,  "using uninitialized variable");
-//        identExpr.setDec(dec);  //save declaration--will be useful later.
-        Type type = dec.nameDef.getType();
+        if (statementAssign.getLv() == null) {
+        throw new TypeCheckException("Error: undefined identifier " + statementAssign.toString());
+    }
+        Type lvType = (Type) statementAssign.getLv().visit(this, null);
+        Type eType = (Type) statementAssign.getE().visit(this, null);
 
-        return type;
+        if (!lvType.equals(eType)) {
+            throw new TypeCheckException("AssignmentStatement type mismatch");
+        }
+
+        return null;
+
+//        String name = statementAssign.toString();
+//        Declaration dec = symbolTable.lookup(name);
+//        checkNull(dec != null,  "undefined identifier " + name);
+//        checkAssigned(dec,  "using uninitialized variable");
+////        identExpr.setDec(dec);  //save declaration--will be useful later.
+//        Type type = dec.nameDef.getType();
+//
+//        return type;
     }
 
     @Override
     public Object visitBinaryExpr(BinaryExpr binaryExpr, Object arg) throws PLCException
     {
-        Declaration dec;
-        if(binaryExpr.right.firstToken.getKind() == IToken.Kind.IDENT)
-        {
-            dec = symbolTable.lookup(binaryExpr.right.firstToken.getTokenString());
-            if(dec==null)
-            {
-                throw new TypeCheckException("Uninitalized Variable");
-            }
+        Type leftType = (Type) binaryExpr.getLeft().visit(this, arg);
+        Type rightType = (Type) binaryExpr.getRight().visit(this, arg);
+        if (!leftType.equals(rightType)) {
+            throw new TypeCheckException("Types of left and right hand side of binary expression do not match");
         }
-        if(binaryExpr.left.firstToken.getKind() == IToken.Kind.IDENT)
-        {
-            dec = symbolTable.lookup(binaryExpr.left.firstToken.getTokenString());
-            if(dec==null)
-            {
-                throw new TypeCheckException("Uninitalized Variable");
-            }
-        }
-        return null;
+        return leftType;
+//        Declaration dec;
+//        if(binaryExpr.right.firstToken.getKind() == IToken.Kind.IDENT)
+//        {
+//            dec = symbolTable.lookup(binaryExpr.right.firstToken.getTokenString());
+//            if(dec==null)
+//            {
+//                throw new TypeCheckException("Uninitalized Variable");
+//            }
+//        }
+//        if(binaryExpr.left.firstToken.getKind() == IToken.Kind.IDENT)
+//        {
+//            dec = symbolTable.lookup(binaryExpr.left.firstToken.getTokenString());
+//            if(dec==null)
+//            {
+//                throw new TypeCheckException("Uninitalized Variable");
+//            }
+//        }
+//        return null;
     }
 
     @Override
@@ -102,10 +120,16 @@ public class TypeChecker  implements ASTVisitor
             stm = block.statementList.get(i);
             if (stm instanceof AssignmentStatement) {
                 visitAssignmentStatement((AssignmentStatement) stm, null);
-            } else if (stm.firstToken.getKind() == IToken.Kind.COLON) {
-                throw new TypeCheckException("Error Invalid Statement");
             }
         }
+
+//        for (int i = 0; i < stmSize; i++) {
+//            stm = block.statementList.get(i);
+//            if (stm instanceof AssignmentStatement) {
+//                visitAssignmentStatement((AssignmentStatement) stm, null);
+//            } else if (stm.firstToken.getKind() == IToken.Kind.COLON) {
+//                throw new TypeCheckException("Error Invalid Statement");
+//            } }
         return null;
     }
 
@@ -164,14 +188,19 @@ public class TypeChecker  implements ASTVisitor
     @Override
     public Object visitIdentExpr(IdentExpr identExpr, Object arg) throws PLCException
     {
-        String name = identExpr.getName();
-        Declaration dec = symbolTable.lookup(name);
-        checkNull(dec != null,  "undefined identifier " + name);
-        checkAssigned(dec,  "using uninitialized variable");
-//        identExpr.setDec(dec);  //save declaration--will be useful later.
-        Type type = dec.nameDef.getType();
-      //  identExpr.setType(type);
-        return type;
+        Declaration dec = symbolTable.lookup(identExpr.getName());
+        if (dec == null) {
+            throw new TypeCheckException("Identifier " + identExpr.getName() + " not defined");
+        }
+        return dec.initializer;
+//        String name = identExpr.getName();
+//        Declaration dec = symbolTable.lookup(name);
+//        checkNull(dec != null,  "undefined identifier " + name);
+//        checkAssigned(dec,  "using uninitialized variable");
+////        identExpr.setDec(dec);  //save declaration--will be useful later.
+//        Type type = dec.nameDef.getType();
+//      //  identExpr.setType(type);
+//        return type;
     }
 
     private void checkAssigned(Declaration dec, String usingUninitializedVariable) throws SyntaxException {
