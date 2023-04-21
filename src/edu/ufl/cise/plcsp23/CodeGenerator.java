@@ -17,7 +17,7 @@ public class CodeGenerator implements ASTVisitor {
         // Add import statements
         code.append("import java.io.*;\n");
         code.append("import java.util.*;\n");
-        code.append("import edu.ufl.cise.plcsp23.ConsoleIO;\n\n");
+  //      code.append("import edu.ufl.cise.plcsp23.ConsoleIO;\n\n");
 
         // Add class definition
         code.append("public class ").append(program.getIdent().getName()).append(" {\n\n");
@@ -42,7 +42,14 @@ public class CodeGenerator implements ASTVisitor {
         code.append(") {\n");
 
         // Add method body
-        code.append(program.getBlock().visit(this, arg));
+        Object blockCode = program.getBlock().visit(this, arg);
+        if (blockCode != null) {
+            code.append(blockCode);
+        }
+        // If the return type is void, add 'return;' to handle the return type
+        if (returnType.equals("void")) {
+            code.append("    return;\n");
+        }
 
         // Close method and class
         code.append("  }\n");
@@ -60,13 +67,23 @@ public class CodeGenerator implements ASTVisitor {
 
     @Override
     public Object visitBinaryExpr(BinaryExpr binaryExpr, Object arg) throws PLCException {
-        return null;
+        String left = (String) binaryExpr.getLeft().visit(this, arg);
+        String right = (String) binaryExpr.getRight().visit(this, arg);
+        String operator = binaryExpr.getOp().toString();
+        return "(" + left + " " + operator + " " + right + ")";
     }
 
     @Override
     public Object visitBlock(Block block, Object arg) throws PLCException {
 
-        return null;
+        StringBuilder code = new StringBuilder();
+        for (Statement statement : block.getStatementList()) {
+            String stmtCode = (String) statement.visit(this, arg);
+            if (stmtCode != null) {
+                code.append("    ").append(stmtCode).append("\n");
+            }
+        }
+        return code.toString();
     }
 
     @Override
@@ -115,7 +132,8 @@ public class CodeGenerator implements ASTVisitor {
 
     @Override
     public Object visitNumLitExpr(NumLitExpr numLitExpr, Object arg) throws PLCException {
-        return null;
+        return String.valueOf(numLitExpr.getValue());
+
     }
 
     @Override
@@ -141,7 +159,8 @@ public class CodeGenerator implements ASTVisitor {
 
     @Override
     public Object visitReturnStatement(ReturnStatement returnStatement, Object arg) throws PLCException {
-        return null;
+        String exprCode = (String) returnStatement.getE().toString();
+        return "return " + exprCode + ";";
     }
 
     @Override
@@ -173,5 +192,6 @@ public class CodeGenerator implements ASTVisitor {
     @Override
     public Object visitZExpr(ZExpr zExpr, Object arg) throws PLCException {
         return null;
+
     }
 }
