@@ -17,13 +17,12 @@ public class CodeGenerator implements ASTVisitor {
         // Add import statements
         code.append("import java.io.*;\n");
         code.append("import java.util.*;\n");
-  //      code.append("import edu.ufl.cise.plcsp23.ConsoleIO;\n\n");
 
         // Add class definition
         code.append("public class ").append(program.getIdent().getName()).append(" {\n\n");
 
         // Add method signature
-        String returnType = program.getType().toString(); // Modify this line to get the Java type corresponding to Type
+        String returnType = program.getType().toString().toLowerCase(); // Modify this line to get the Java type corresponding to Type
         code.append("  public static ").append(returnType).append(" apply(");
 
         // Add method parameters
