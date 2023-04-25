@@ -10,23 +10,19 @@ public class TypeChecker  implements ASTVisitor
 
     public TypeChecker()
     {
-        ASTVisitor ast;
-//        this.symbolTable.insert(ast.toString(),ast.visitDeclaration())
     }
 
 
     public static class SymbolTable {
 
-        HashMap<String,Declaration> entries = new HashMap<>();
+        HashMap<String,Declaration> entr = new HashMap<>();
 
-        //returns true if name successfully inserted in symbol table, false if already present
         public  boolean insert(String name, Declaration declaration) {
-            return (entries.putIfAbsent(name,declaration) == null);
+            return (entr.putIfAbsent(name,declaration) == null);
         }
 
-        //returns Declaration if present, or null if name not declared.
         public Declaration lookup(String name) {
-            return entries.get(name);
+            return entr.get(name);
         }
     }
     SymbolTable symbolTable = new SymbolTable();
@@ -41,23 +37,14 @@ public class TypeChecker  implements ASTVisitor
         if (statementAssign.getLv() == null) {
         throw new TypeCheckException("Error: undefined identifier " + statementAssign.toString());
     }
-        Type lvType = (Type) statementAssign.getLv().visit(this, null);
+        Type lType = (Type) statementAssign.getLv().visit(this, null);
         Type eType = (Type) statementAssign.getE().visit(this, null);
 
-        if (!lvType.equals(eType)) {
+        if (!lType.equals(eType)) {
             throw new TypeCheckException("AssignmentStatement type mismatch");
         }
 
         return null;
-
-//        String name = statementAssign.toString();
-//        Declaration dec = symbolTable.lookup(name);
-//        checkNull(dec != null,  "undefined identifier " + name);
-//        checkAssigned(dec,  "using uninitialized variable");
-////        identExpr.setDec(dec);  //save declaration--will be useful later.
-//        Type type = dec.nameDef.getType();
-//
-//        return type;
     }
 
     @Override
@@ -69,24 +56,7 @@ public class TypeChecker  implements ASTVisitor
             throw new TypeCheckException("Types of left and right hand side of binary expression do not match");
         }
         return leftType;
-//        Declaration dec;
-//        if(binaryExpr.right.firstToken.getKind() == IToken.Kind.IDENT)
-//        {
-//            dec = symbolTable.lookup(binaryExpr.right.firstToken.getTokenString());
-//            if(dec==null)
-//            {
-//                throw new TypeCheckException("Uninitalized Variable");
-//            }
-//        }
-//        if(binaryExpr.left.firstToken.getKind() == IToken.Kind.IDENT)
-//        {
-//            dec = symbolTable.lookup(binaryExpr.left.firstToken.getTokenString());
-//            if(dec==null)
-//            {
-//                throw new TypeCheckException("Uninitalized Variable");
-//            }
-//        }
-//        return null;
+
     }
 
     @Override
@@ -123,13 +93,6 @@ public class TypeChecker  implements ASTVisitor
             }
         }
 
-//        for (int i = 0; i < stmSize; i++) {
-//            stm = block.statementList.get(i);
-//            if (stm instanceof AssignmentStatement) {
-//                visitAssignmentStatement((AssignmentStatement) stm, null);
-//            } else if (stm.firstToken.getKind() == IToken.Kind.COLON) {
-//                throw new TypeCheckException("Error Invalid Statement");
-//            } }
         return null;
     }
 
@@ -193,14 +156,7 @@ public class TypeChecker  implements ASTVisitor
             throw new TypeCheckException("Identifier " + identExpr.getName() + " not defined");
         }
         return dec.initializer;
-//        String name = identExpr.getName();
-//        Declaration dec = symbolTable.lookup(name);
-//        checkNull(dec != null,  "undefined identifier " + name);
-//        checkAssigned(dec,  "using uninitialized variable");
-////        identExpr.setDec(dec);  //save declaration--will be useful later.
-//        Type type = dec.nameDef.getType();
-//      //  identExpr.setType(type);
-//        return type;
+
     }
 
     private void checkAssigned(Declaration dec, String usingUninitializedVariable) throws SyntaxException {
@@ -272,8 +228,8 @@ public class TypeChecker  implements ASTVisitor
         }
         dec = new Declaration(program.firstToken,nameDf,null);
         symbolTable.insert(program.ident.getName(), null);
-        int prmListLength =program.paramList.size();
-        for(int i=0; i<prmListLength; i++)
+        int plLength =program.paramList.size();
+        for(int i=0; i<plLength; i++)
         {
             Declaration  decLookup = symbolTable.lookup(program.paramList.get(i).ident.getName());
             if(decLookup != null)
