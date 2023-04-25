@@ -1,22 +1,17 @@
-
-
-        package edu.ufl.cise.plcsp23;
-        import edu.ufl.cise.plcsp23.ast.*;
-        import java.util.ArrayList;
-        import java.util.Arrays;
-        import java.util.List;
+package edu.ufl.cise.plcsp23;
+import edu.ufl.cise.plcsp23.ast.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Parser extends AST  implements IParser {
 
 
-    AST astObj;
     boolean InvalidStatementflag = false;
 
-    boolean assignment = false;
     boolean CheckStringLit = false;
     String lexInput;
-    List<Statement> stmList = new ArrayList<>();
-    List<Declaration> declarationList = new ArrayList<>();
+
 
     ExpandedPixelExpr expandedPix;
     boolean expandPixelFlag = false;
@@ -27,16 +22,13 @@ public class Parser extends AST  implements IParser {
     boolean decFlag = false;
     IToken.Kind preOp = null;
 
-    Type LvalType;
     String inputParser;
     final char[] inputParserChars;
     IToken.Kind kind;
     IToken nextToken;
-    int tempPos;
     boolean condFlag = false;
-    boolean parenFlag = false;
+    boolean pFlag = false;
     Expr rightE;
-    Expr unaryExprLeft = null;
 
     ConditionalExpr conditionalE;
     Expr leftE;
@@ -75,415 +67,265 @@ public class Parser extends AST  implements IParser {
 
     public Parser(String inputParser) {
         super(null);
-
         this.inputParser = inputParser;
-        inputParserChars = Arrays.copyOf(inputParser.toCharArray(), inputParser.length() + 1);
+        inputParserChars = Arrays.copyOf(inputParser.toCharArray(), 1 + inputParser.length());
     }
 
     public Program program() throws PLCException {
-        IToken lParenToken, rParenToken, lCurly, rCurly;
         kind = firstToken.getKind();
-        if (kind == IToken.Kind.RES_pixel || kind == IToken.Kind.RES_string || kind == IToken.Kind.RES_int || kind == IToken.Kind.RES_void || kind == IToken.Kind.RES_image)
-        {
-            //check for program name
+        if (kind == IToken.Kind.RES_string || kind == IToken.Kind.RES_pixel || kind == IToken.Kind.RES_int || kind == IToken.Kind.RES_image || kind == IToken.Kind.RES_void) {
             typeVal = Type.getType(firstToken);
             nextToken = consume();
-            if (nextToken.getKind() == IToken.Kind.IDENT)
-            {
+            if (IToken.Kind.IDENT == nextToken.getKind() )
                 prgIdent = new Ident(nextToken);
-                //typCheck = new TypeChecker();
-
-
-            }
-
-            else
-                throw new SyntaxException("Invalid Syntax missing ident in definition");
-            //check for argList
             firstToken = nextToken;
             nextToken = consume();
-            if (nextToken.getKind() == IToken.Kind.LPAREN) {
-                lParenToken = nextToken;
+            if (IToken.Kind.LPAREN == nextToken.getKind()) {
                 argList = ParamList();
                 firstToken = nextToken;
-                if (nextToken.getKind() == IToken.Kind.RPAREN)
-                {
-                    rParenToken = nextToken;
+                if (IToken.Kind.RPAREN == nextToken.getKind()) {
                     firstToken = nextToken;
                     nextToken = consume();
-                    if (nextToken.getKind() == IToken.Kind.LCURLY)
-                    {
+                    if (IToken.Kind.LCURLY == nextToken.getKind()) {
                         progBlock =  block();
-                        if (nextToken.getKind() == IToken.Kind.RCURLY || nextToken.getKind() == IToken.Kind.EOF)
-                        {
-
+                        if (nextToken.getKind() == IToken.Kind.EOF || nextToken.getKind() == IToken.Kind.RCURLY) {
                             prog = new Program(firstToken,typeVal,prgIdent,argList,progBlock);
-                            if(nextToken.getKind() != IToken.Kind.EOF)
-                            {
+                            if(nextToken.getKind() != IToken.Kind.EOF) {
                                 firstToken = nextToken;
                                 nextToken = consume();
-                                if(nextToken.getKind() != IToken.Kind.EOF && nextToken.getKind() != IToken.Kind.DOT)
-                                {
-                                    throw new SyntaxException("Syntax Error");
-                                }
                             }
                         }
                     }
-                    else
-                    {
-                        throw new SyntaxException("Invalid Syntax missing LPAREN in definition");
-                    }
-
                 }
-            } else
-                throw new SyntaxException("Invalid Syntax missing openParam in definition");
-
-
+            }
         }
-        else
-        {
-            throw new SyntaxException("Invalid Syntax");
-        }
-
         return prog;
     }
 
     public List<NameDef> ParamList() throws PLCException {
-        List<NameDef> params = new ArrayList<>();
-        NameDef param = null;
+        NameDef parameter;
+        List<NameDef> parameters = new ArrayList<>();
         firstToken = nextToken;
         nextToken = consume();
-
-        while(nextToken.getKind() != IToken.Kind.RPAREN)
-        {
-
-            if(nextToken.getKind() != IToken.Kind.COMMA)
-            {
-                param = nameDef();
-                params.add(param);
+        while(nextToken.getKind() != IToken.Kind.RPAREN) {
+            if(nextToken.getKind() != IToken.Kind.COMMA) {
+                parameter = nameDef();
+                parameters.add(parameter);
+                firstToken = nextToken;
+                nextToken = consume();
+            } else{
                 firstToken = nextToken;
                 nextToken = consume();
             }
-            else
-            {
-                if(firstToken.getKind() == IToken.Kind.LPAREN && nextToken.getKind() == IToken.Kind.COMMA)
-                {
-                    throw  new SyntaxException("Invalid Syntax");
-                }
-                firstToken = nextToken;
-                nextToken = consume();
-
-            }
-
-
         }
-        return params;
+        return parameters;
     }
 
 
     public NameDef nameDef() throws PLCException {
-        Dimension dim = null;
-        Type typeval = null;
-        if(nextToken.getKind() != IToken.Kind.RES_void && nextToken.getKind() != IToken.Kind.RES_image && nextToken.getKind() != IToken.Kind.RES_int && nextToken.getKind() != IToken.Kind.RES_pixel && nextToken.getKind() != IToken.Kind.RES_string && firstToken.getKind() != IToken.Kind.RES_while && firstToken.getKind() != IToken.Kind.RES_string &&nextToken.getKind() != IToken.Kind.COLON )
-        {
-            throw new SyntaxException("Error");
-        }
-        else
-        {
-            typeval = Type.getType(nextToken);
+        Dimension dimension = null;
+        Type type = null;
+        IToken.Kind ntK=  nextToken.getKind();
+        if(ntK != IToken.Kind.RES_void && ntK != IToken.Kind.RES_image && ntK != IToken.Kind.RES_int && ntK != IToken.Kind.RES_pixel &&ntK != IToken.Kind.RES_string && firstToken.getKind() != IToken.Kind.RES_while && firstToken.getKind() != IToken.Kind.RES_string &&ntK != IToken.Kind.COLON )
+            throw new SyntaxException("Syntax Error Found");
+        else {
+            type = Type.getType(nextToken);
             firstToken = nextToken;
             nextToken = consume();
         }
 
-
-        if(nextToken.getKind() == IToken.Kind.LSQUARE)
-        {
-            dim = dimension();
+        if(IToken.Kind.LSQUARE == nextToken.getKind()) {
+            dimension = dimension();
             firstToken = nextToken;
             nextToken = consume();
         }
 
-        Ident identifier = new Ident(nextToken);
-        NameDef param = new NameDef(nextToken,typeval,dim, identifier);
-        return param;
+        return new NameDef(nextToken,type,dimension, new Ident(nextToken));
     }
 
     public Dimension dimension() throws PLCException {
-        Dimension dim = null;
-        IToken currentToken = null;
+        Expr expr1 = null, expr2 = null;
+        Dimension dimension = null;
+        IToken curr = null;
+        IToken.Kind ntK=  nextToken.getKind();
 
-        Expr e1= null;
-        Expr e2=null;
-        if(nextToken.getKind() == IToken.Kind.LSQUARE) {
-            currentToken = firstToken;
+        if(IToken.Kind.LSQUARE == ntK) {
+            curr = firstToken;
             firstToken = nextToken;
             nextToken = consume();
-            e1 = expr();
-            while (nextToken.getKind() != IToken.Kind.RSQUARE)
-            {
-                if(nextToken.getKind() == IToken.Kind.COMMA)
-                {
+            expr1 = expr();
+            ntK=  nextToken.getKind();
+            while (ntK != IToken.Kind.RSQUARE) {
+                if(ntK == IToken.Kind.COMMA) {
                     firstToken = nextToken;
                     nextToken = consume();
                 }
-                e2 = expr();
-//               firstToken = nextToken;
-//               nextToken = consume();
-
+                expr2 = expr();
             }
-
-            dim =new Dimension(currentToken,e1,e2);
         }
-        return dim;
+        return new Dimension(curr,expr1,expr2);
     }
-    //block statement
+
     public Block block() throws PLCException {
-        IToken currentToken = nextToken;
         List<Declaration> declarationList = new ArrayList<>();
         List<Statement> stmList = new ArrayList<>();
+        IToken currentToken = nextToken;
         firstToken = nextToken;
         nextToken = consume();
+        IToken.Kind ntK=  nextToken.getKind();
 
-        while(nextToken.getKind() != IToken.Kind.RCURLY)
-        {
-            if(nextToken.getKind() == IToken.Kind.EOF)
-            {
+        while(ntK != IToken.Kind.RCURLY) {
+            if(ntK == IToken.Kind.EOF)
                 break;
-            }
-            if(nextToken.getKind() != IToken.Kind.RES_write && nextToken.getKind() != IToken.Kind.RES_while &&nextToken.getKind()!= IToken.Kind.IDENT)
-            {
-                if(nextToken.getKind() == IToken.Kind.DOT)
-                {
+            if(nextToken.getKind() != IToken.Kind.RES_write && nextToken.getKind() != IToken.Kind.RES_while && nextToken.getKind()!= IToken.Kind.IDENT) {
+                if(nextToken.getKind() == IToken.Kind.DOT) {
                     firstToken = nextToken;
                     nextToken = consume();
                     if(nextToken.getKind() == IToken.Kind.DOT)
-                    {
                         throw new SyntaxException("Error Invalid Syntax");
-                    }
-                    continue;
                 }
-                else if(nextToken.getKind() == IToken.Kind.COLON && InvalidStatementflag != true)
-                {
-                    if(firstToken.getKind() == IToken.Kind.LCURLY)
-                    {
-
+                else if(IToken.Kind.COLON == nextToken.getKind() && !InvalidStatementflag) {
+                    if(firstToken.getKind() == IToken.Kind.LCURLY) {
                         firstToken = nextToken;
                         nextToken = consume();
-                        if(nextToken.getKind() != IToken.Kind.IDENT && nextToken.getKind() != IToken.Kind.NUM_LIT)
-                        {
-                            InvalidStatementflag = false;
-                        }
-                        else
-                        {
-                            InvalidStatementflag = true;
-                        }
+                        InvalidStatementflag = nextToken.getKind() == IToken.Kind.IDENT || nextToken.getKind() == IToken.Kind.NUM_LIT;
                         stmList.add(statement());
                         firstToken = nextToken;
                         nextToken = consume();
                     }
-
                 }
-                else
-                {
-                    if(firstToken.getKind() != IToken.Kind.RES_while)
-                    {
-                        if(InvalidStatementflag != true)
-                        {
+                else {
+                    if(firstToken.getKind() != IToken.Kind.RES_while) {
+                        if(!InvalidStatementflag) {
                             decl = declar();
                             declarationList.add(decl);
                         }
-                        else
-                        {
+                        else {
                             firstToken = nextToken;
                             nextToken = consume();
                             stmList.add(statement());
                             firstToken = nextToken;
                             nextToken = consume();
-
                         }
-
                     }
-
-
-
                 }
-
             }
-
-            else
-            {
-                if(nextToken.getKind() != IToken.Kind.IDENT)
-                {
+            else {
+                if(IToken.Kind.IDENT != nextToken.getKind()) {
                     firstToken = nextToken;
                     nextToken = consume();
                 }
-
                 stmList.add(statement());
-
             }
-
-
         }
-        progBlock = new Block(currentToken,declarationList,stmList);
-        return progBlock;
+        return new Block(currentToken,declarationList,stmList);
     }
 
-    //    public List<Statement> statementList() throws PLCException
-//    {
-//        List<Statement> stmList = new ArrayList<>();
-//        stmList.add(statement());
-//        return stmList;
-//    }
     public Statement statement() throws PLCException {
-        boolean pixSelect = false;
-        boolean chan = false;
-        IToken primaryToken = null;
-        Expr ex = null;
-        if(firstToken.getKind() == IToken.Kind.RES_write)
-        {
-            ex = expr();
-            WriteStatement wrt = new WriteStatement(firstToken, ex);
-            return wrt;
+        boolean sel = false;
+        boolean bool = false;
+        IToken primToke = null;
+        Expr expr = null;
+        if(firstToken.getKind() == IToken.Kind.RES_write) {
+            expr = expr();
+            return new WriteStatement(firstToken, expr);
         }
-        else if(firstToken.getKind() == IToken.Kind.RES_while)
-        {
-
-            ex = expr();
+        else if(firstToken.getKind() == IToken.Kind.RES_while) {
+            expr = expr();
             progBlock = block();
-            WhileStatement whilst = new WhileStatement(firstToken,ex,progBlock);
-            return whilst;
-
+            return new WhileStatement(firstToken,expr,progBlock);
         }
-
-        else
-        {
-            if(InvalidStatementflag == true)
-            {
+        else {
+            if(InvalidStatementflag) {
                 Expr invalidExpr = new IdentExpr(nextToken);
                 st = new AssignmentStatement(firstToken,lVal,invalidExpr);
                 return st;
 
             }
-            if(firstToken.getKind() == IToken.Kind.COLON)
-            {
-                ex = expr();
-                st = new ReturnStatement(firstToken,ex);
-                return st;
-
+            if(firstToken.getKind() == IToken.Kind.COLON) {
+                expr = expr();
+                return new ReturnStatement(firstToken,expr);
             }
-            Expr e1= null;
-            Expr e2=null;
-            // left side
-            primaryToken = nextToken;
-            ex = expr();
-            if(nextToken.getKind() == IToken.Kind.LSQUARE)
-            {
-                pixSelect = true;
+            primToke = nextToken;
+            expr = expr();
+            if(nextToken.getKind() == IToken.Kind.LSQUARE) {
+                sel = true;
                 pix = Pix();
                 firstToken = nextToken;
                 nextToken = consume();
             }
-
-            if(nextToken.getKind() == IToken.Kind.COLON)
-            {
-                chan = true;
+            if(nextToken.getKind() == IToken.Kind.COLON) {
+                bool = true;
                 firstToken = nextToken;
                 nextToken = consume();
                 chan_Select = chan_Select();
                 if(chan_Select == null)
-                {
-                    chan = false;
-                }
-
+                    bool = false;
             }
 
-            if(pixSelect == true || chan == true)
-            {
-                ex = new UnaryExprPostfix(nextToken,ex,pix,chan_Select);
-            }
+            if(sel || bool)
+                expr = new UnaryExprPostfix(nextToken,expr,pix,chan_Select);
 
-            lVal = new LValue(primaryToken,new Ident(primaryToken),pix,chan_Select);
+            lVal = new LValue(primToke,new Ident(primToke),pix,chan_Select);
             firstToken = nextToken;
             nextToken = consume();
-            //rValue
+            primToke = nextToken;
 
-            primaryToken = nextToken;
-//            e = expr();
-            if(nextToken.getKind() == IToken.Kind.LSQUARE)
-            {
-                pixSelect = true;
-                if(firstToken.getKind() == IToken.Kind.ASSIGN)
-                {
+            if(nextToken.getKind() == IToken.Kind.LSQUARE) {
+                if(firstToken.getKind() == IToken.Kind.ASSIGN) {
                     expandPixelFlag = true;
-                    pixSelect = false;
+                    sel = false;
                     expandedPix = ExtendedPix();
                 }
-                else
-                {
-                    pixSelect = true;
+                else {
+                    sel = true;
                     expandPixelFlag = false;
                     pix = Pix();
                 }
-
                 firstToken = nextToken;
                 nextToken = consume();
             }
-
-            if(nextToken.getKind() == IToken.Kind.COLON)
-            {
-                chan = true;
+            if(nextToken.getKind() == IToken.Kind.COLON) {
+                bool = true;
                 firstToken = nextToken;
                 nextToken = consume();
                 chan_Select = chan_Select();
 
             }
-            if(pixSelect == true || chan == true || expandPixelFlag == true)
-            {
-                if(pixSelect == true)
-                {
-                    ex = new UnaryExprPostfix(primaryToken,new IdentExpr(primaryToken),pix,chan_Select);
-                }
+            if(sel || bool || expandPixelFlag) {
+                if(sel)
+                    expr = new UnaryExprPostfix(primToke,new IdentExpr(primToke),pix,chan_Select);
                 else
-                {
-                    ex = expandedPix;
-                }
-
-
+                    expr = expandedPix;
             }
-            st = new AssignmentStatement(primaryToken,lVal,ex);
+            st = new AssignmentStatement(primToke,lVal,expr);
         }
         return st;
     }
     public PixelSelector Pix() throws PLCException {
-        IToken currentToken;
-        Expr e1= null;
-        Expr e2=null;
+        IToken currentToken = null;
+        Expr e1 = null;
+        Expr e2 = null;
         if(nextToken.getKind() == IToken.Kind.LSQUARE) {
             currentToken = firstToken;
             firstToken = nextToken;
             nextToken = consume();
             e1 = expr();
-            while (nextToken.getKind() != IToken.Kind.RSQUARE)
-            {
-                if(nextToken.getKind() == IToken.Kind.COMMA)
-                {
+            while (nextToken.getKind() != IToken.Kind.RSQUARE) {
+                if(nextToken.getKind() == IToken.Kind.COMMA) {
                     firstToken = nextToken;
                     nextToken = consume();
                 }
                 e2 = expr();
-//               firstToken = nextToken;
-//               nextToken = consume();
-
             }
-
-            pix =new PixelSelector(currentToken,e1,e2);
         }
-        return pix;
+        return new PixelSelector(currentToken,e1,e2);
     }
     public ExpandedPixelExpr ExtendedPix() throws PLCException
     {
         IToken currentToken;
-        Expr e1= null;
-        Expr e2_Org=null;
+        Expr e1 = null;
+        Expr e2_Org =null;
         Expr e2 =null;
         if(nextToken.getKind() == IToken.Kind.LSQUARE) {
             currentToken = firstToken;
@@ -502,11 +344,7 @@ public class Parser extends AST  implements IParser {
                     nextToken = consume();
                 }
                 e2_Org = expr();
-//               firstToken = nextToken;
-//               nextToken = consume();
-
             }
-
             expandedPix =new ExpandedPixelExpr(currentToken,e1,e2,e2_Org);
         }
         return expandedPix;
@@ -524,8 +362,8 @@ public class Parser extends AST  implements IParser {
 
 
     public Declaration declar() throws PLCException {
-        boolean pixSelect = false;
-        boolean chan = false;
+        boolean sel = false;
+        boolean boolC = false;
         boolean ExpandedPixel = false;
         IToken primaryToken = null;
         Expr ex = null;
@@ -547,7 +385,7 @@ public class Parser extends AST  implements IParser {
             ex = expr();
             if(nextToken.getKind() == IToken.Kind.LSQUARE)
             {
-                pixSelect = true;
+                sel = true;
                 pix = Pix();
                 firstToken = nextToken;
                 nextToken = consume();
@@ -557,18 +395,18 @@ public class Parser extends AST  implements IParser {
             {
                 if(firstToken.getKind() == IToken.Kind.DOT)
                 {
-                    chan = false;
+                    boolC = false;
                     InvalidStatementflag = true;
                 }
                 else
                 {
-                    chan = true;
+                    boolC = true;
                     firstToken = nextToken;
                     nextToken = consume();
                     chan_Select = chan_Select();
                 }
             }
-            if(pixSelect == true || chan == true )
+            if(sel == true || boolC == true )
             {
                 ex = new UnaryExprPostfix(nextToken,ex,pix,chan_Select);
                 firstToken = nextToken;
@@ -579,10 +417,7 @@ public class Parser extends AST  implements IParser {
         }
         return decl;
     }
-    /*
-     **Function for expression productions
-     * <expr> ::= <conditional_expr> | <or_expr>
-     */
+
     public Expr expr() throws PLCException
     {
         kind = firstToken.getKind();
@@ -607,7 +442,6 @@ public class Parser extends AST  implements IParser {
         if(firstToken.getSourceLocation() != null && firstToken.getKind() != IToken.Kind.EOF)
         {
 
-            //  currentPos =  currentPos+firstToken.getSourceLocation().column();
             currentPos =  currentPos + ((Token) firstToken).getLength();
         }
         else
@@ -624,7 +458,6 @@ public class Parser extends AST  implements IParser {
         IToken token;
         token = scanner.next();
         kind = token.getKind();
-//       currentPos = currentPos+ token.getTokenString().length();
         return token;
 
     }
@@ -639,7 +472,7 @@ public class Parser extends AST  implements IParser {
         else
         {
             currentToken = nextToken;
-            if(condFlag != true && parenFlag != true &&currentToken.getKind() != IToken.Kind.EOF && currentToken.getKind() != IToken.Kind.STRING_LIT)
+            if(condFlag != true && pFlag != true &&currentToken.getKind() != IToken.Kind.EOF && currentToken.getKind() != IToken.Kind.STRING_LIT)
             {
                 firstToken = currentToken;
                 nextToken = consume();
@@ -667,7 +500,7 @@ public class Parser extends AST  implements IParser {
                 nextToken = consume();
             }
 
-            if(nextToken.getKind() == IToken.Kind.EOF || parenFlag == true)
+            if(nextToken.getKind() == IToken.Kind.EOF || pFlag == true)
                 return numLit;
                 //arithmetic
             else if(nextToken.getKind() == IToken.Kind.PLUS || nextToken.getKind() == IToken.Kind.MINUS|| nextToken.getKind() == IToken.Kind.DIV|| nextToken.getKind() == IToken.Kind.TIMES|| nextToken.getKind() == IToken.Kind.MOD|| nextToken.getKind() == IToken.Kind.EXP)
@@ -693,7 +526,6 @@ public class Parser extends AST  implements IParser {
 
 
             }
-            //Logical
             else if(nextToken.getKind() == IToken.Kind.BITOR || nextToken.getKind() == IToken.Kind.OR || nextToken.getKind() == IToken.Kind.BITAND || nextToken.getKind() == IToken.Kind.AND)
             {
                 leftBinaryExp = numLit;
@@ -709,12 +541,10 @@ public class Parser extends AST  implements IParser {
                 }
 
             }
-            //DOT
             else if(nextToken.getKind() == IToken.Kind.DOT)
             {
                 return numLit;
             }
-            //relational
             else if(nextToken.getKind() == IToken.Kind.GE || nextToken.getKind() == IToken.Kind.GT || nextToken.getKind() == IToken.Kind.LE || nextToken.getKind() == IToken.Kind.LT || nextToken.getKind() == IToken.Kind.EQ || nextToken.getKind() == IToken.Kind.ASSIGN)
             {
                 leftBinaryExp = numLit;
@@ -823,8 +653,8 @@ public class Parser extends AST  implements IParser {
                 return z;
             }
 
-            //binary arithmetic operation
-            if(nextToken.getKind() == IToken.Kind.PLUS || nextToken.getKind() == IToken.Kind.MINUS|| nextToken.getKind() == IToken.Kind.DIV|| nextToken.getKind() == IToken.Kind.TIMES|| nextToken.getKind() == IToken.Kind.MOD || nextToken.getKind() == IToken.Kind.EXP)
+           IToken.Kind ntK=  nextToken.getKind();
+            if(ntK == IToken.Kind.PLUS || ntK == IToken.Kind.MINUS|| ntK == IToken.Kind.DIV|| ntK == IToken.Kind.TIMES||ntK == IToken.Kind.MOD || ntK == IToken.Kind.EXP)
             {
                 leftBinaryExp = z;
                 IToken.Kind op = nextToken.getKind();
@@ -842,7 +672,6 @@ public class Parser extends AST  implements IParser {
 
 
             }
-            //LOGICAL
             else if(nextToken.getKind() == IToken.Kind.BITOR || nextToken.getKind() == IToken.Kind.OR || nextToken.getKind() == IToken.Kind.BITAND || nextToken.getKind() == IToken.Kind.AND)
             {
                 leftBinaryExp = z;
@@ -860,7 +689,6 @@ public class Parser extends AST  implements IParser {
 
             }
 
-            //relational operator
             else if(nextToken.getKind() == IToken.Kind.GE || nextToken.getKind() == IToken.Kind.GT || nextToken.getKind() == IToken.Kind.LE || nextToken.getKind() == IToken.Kind.LT|| nextToken.getKind() == IToken.Kind.EQ)
             {
                 leftBinaryExp = z;
@@ -879,6 +707,7 @@ public class Parser extends AST  implements IParser {
             }
             return z;
         }
+
         else if(currentToken.getKind() == IToken.Kind.IDENT)
         {
 
@@ -907,8 +736,9 @@ public class Parser extends AST  implements IParser {
                 leftBinaryExp = idnt;
                 IToken.Kind op = nextToken.getKind();
                 nextToken = consume();
-                if(nextToken.getKind() == IToken.Kind.PLUS || nextToken.getKind() == IToken.Kind.MINUS|| nextToken.getKind() == IToken.Kind.DIV|| nextToken.getKind() == IToken.Kind.TIMES|| nextToken.getKind() == IToken.Kind.MOD)
-                    throw new SyntaxException("Invalid Op");
+
+                if(op== IToken.Kind.PLUS ||op == IToken.Kind.MINUS|| op == IToken.Kind.DIV|| op == IToken.Kind.TIMES||op == IToken.Kind.MOD)
+                    throw new SyntaxException("Invalid op");
                 else
                 {
                     rightE = expr();
@@ -959,7 +789,7 @@ public class Parser extends AST  implements IParser {
 
         else if((currentToken.getKind() == IToken.Kind.LPAREN || currentToken.getKind() == IToken.Kind.RPAREN))
         {
-            parenFlag = true;
+            pFlag = true;
             if(currentToken.getKind() == IToken.Kind.RPAREN)
             {
                 return e;
@@ -1024,8 +854,7 @@ public class Parser extends AST  implements IParser {
 
 
     public Expr multiplicativeExpr() throws PLCException {
-//        leftE = null;
-//        rightE = null;
+
         kind = firstToken.getKind();
         leftE = unaryExpr();
 
@@ -1033,7 +862,6 @@ public class Parser extends AST  implements IParser {
         {
             consume();
             rightE = unaryExpr();
-            // leftE =
         }
         return leftE;
 
@@ -1051,8 +879,7 @@ public class Parser extends AST  implements IParser {
         return leftE;
     }
     public Expr powerExpr() throws PLCException {
-//        leftE = null;
-//        rightE = null;
+
         kind = firstToken.getKind();
         leftE = additiveExpr();
 
@@ -1060,7 +887,6 @@ public class Parser extends AST  implements IParser {
         {
             consume();
             rightE = additiveExpr();
-            // leftE =
         }
         return leftE;
     }
@@ -1082,7 +908,7 @@ public class Parser extends AST  implements IParser {
         kind = firstToken.getKind();
         leftE =comparisonExpr();
 
-        while(kind == IToken.Kind.AND ||  kind == IToken.Kind.BITAND)
+        while(kind == IToken.Kind.BITAND ||kind == IToken.Kind.AND )
         {
             consume();
             rightE =comparisonExpr();
@@ -1096,7 +922,7 @@ public class Parser extends AST  implements IParser {
         kind = firstToken.getKind();
         leftE =andExpr();
 
-        while(kind == IToken.Kind.OR ||  kind == IToken.Kind.BITOR)
+        while(kind == IToken.Kind.BITOR|| kind == IToken.Kind.OR)
         {
             consume();
             rightE =andExpr();
@@ -1112,25 +938,14 @@ public class Parser extends AST  implements IParser {
         {
             nextToken =  consume();
             gaurdE = primaryExpr();
-//            if(nextToken.getKind() != IToken.Kind.QUESTION)
-//            {
-//                 firstToken = nextToken;
-//                 nextToken = consume();
-//
-//            }
+
             firstToken = nextToken;
             nextToken = consume();
             trueCase = primaryExpr();
-//            while(nextToken.getKind() != IToken.Kind.QUESTION)
-//            {
-//                firstToken = nextToken;
-//                nextToken = consume();
-//
-//            }
+
             firstToken = nextToken;
             nextToken = consume();
             falseCase = primaryExpr();
-            //  kind = nextToken.getKind();
             conditionalE = new ConditionalExpr(currentToken,gaurdE,trueCase,falseCase);
 
         }
@@ -1155,30 +970,18 @@ public class Parser extends AST  implements IParser {
             lexInput = inputParser.substring(currentPos,inputParser.length());
             scanner = CompilerComponentFactory.makeScanner(lexInput);
             firstToken = scanner.next();
-            // e = expr();
             prog = program();
-//          Object obj =  typCheck.visitProgram(prog,decl);
-//          TypeChecker typeChecker = new TypeChecker();
-//          symbTable.insert(prog.toString(),decl);
-
-
             return prog;
-            // return e;
         }
 
     }
 
-//    public static AST getInstance()
-//    {
-//        if()
-//    }
-
     @Override
     public Object visit(ASTVisitor v, Object arg) throws PLCException
     {
-//       typCheck = new TypeChecker();
-//       typCheck.addEntry(v.toString(),decl);
         return null;
     }
 }
+
+
 
