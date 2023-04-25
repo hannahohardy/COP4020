@@ -1,7 +1,6 @@
 package edu.ufl.cise.plcsp23.ast;
 
 import edu.ufl.cise.plcsp23.*;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 public class TypeChecker  implements ASTVisitor
@@ -35,7 +34,7 @@ public class TypeChecker  implements ASTVisitor
     public Object visitAssignmentStatement(AssignmentStatement statementAssign, Object arg) throws PLCException
     {
         if (statementAssign.getLv() == null) {
-        throw new TypeCheckException("Error: undefined identifier " + statementAssign.toString());
+        throw new TypeCheckException("Error: undefined identifier " + statementAssign);
     }
         Type lType = (Type) statementAssign.getLv().visit(this, null);
         Type eType = (Type) statementAssign.getE().visit(this, null);
@@ -66,8 +65,7 @@ public class TypeChecker  implements ASTVisitor
         Declaration decStatement;
         for(int i=0; i< declSize; i++)
         {
-            Declaration  decLookup = symbolTable.lookup(block.decList.get(i).nameDef.ident.getName());
-            if(decLookup != null)
+            if(symbolTable.lookup(block.decList.get(i).nameDef.ident.getName()) != null)
             {
                 throw new TypeCheckException("Parameter already defined");
             }
@@ -75,6 +73,7 @@ public class TypeChecker  implements ASTVisitor
             {
                 visitBinaryExpr((BinaryExpr) block.decList.get(i).initializer,null);
             }
+
             if(block.decList.get(i).initializer instanceof IdentExpr)
             {
                 visitIdentExpr((IdentExpr) block.decList.get(i).initializer,null);
@@ -110,9 +109,10 @@ public class TypeChecker  implements ASTVisitor
         if (expr != null) {
             Type exprType = (Type) expr.visit(this, arg);
 
-            if (type == Type.IMAGE && exprType == Type.STRING) {
-                // Allow image initialization from a URL (string)
-            } else if (type != exprType) {
+           // if (type == Type.IMAGE && exprType == Type.STRING) {
+
+           // }
+         if (type != exprType) {
                 throw new PLCException("Type mismatch in declaration");
             }
         }
@@ -159,31 +159,6 @@ public class TypeChecker  implements ASTVisitor
 
     }
 
-    private void checkAssigned(Declaration dec, String usingUninitializedVariable) throws SyntaxException {
-        boolean isAssigned = false;
-        Expr e = dec.getInitializer();
-        if(e == null)
-        {
-            throw new SyntaxException(usingUninitializedVariable);
-        }
-
-    }
-
-    public void addEntry(String s,Declaration dec )
-    {
-        symbolTable.insert(s,dec);
-    }
-
-    private void checkNull(boolean b, String s) throws SyntaxException {
-        if(b != true)
-        {
-            throw new SyntaxException(s);
-        }
-
-
-
-    }
-
     @Override
     public Object visitLValue(LValue lValue, Object arg) throws PLCException {
         return null;
@@ -197,7 +172,6 @@ public class TypeChecker  implements ASTVisitor
     @Override
     public Object visitNumLitExpr(NumLitExpr numLitExpr, Object arg) throws PLCException
     {
-      //  numLitExpr.setType(Type.INT);
         return Type.INT;
 
     }
@@ -219,7 +193,7 @@ public class TypeChecker  implements ASTVisitor
 
     @Override
     public Object visitProgram(Program program, Object arg) throws PLCException {
-        Declaration decParam = null;
+        Declaration decParam;
         Declaration dec = symbolTable.lookup(program.ident.getName());
         NameDef nameDf = new NameDef(program.firstToken ,program.type,null,program.getIdent());
         if(dec != null)
@@ -263,7 +237,6 @@ public class TypeChecker  implements ASTVisitor
     @Override
     public Object visitStringLitExpr(StringLitExpr stringLitExpr, Object arg) throws PLCException
     {
-      //  stringLitExpr.setType(Type.STRING);
         return Type.STRING;
     }
 
